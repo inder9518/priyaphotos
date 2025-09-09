@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Google Drive Auto Photo Sync</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body { padding: 20px; }
+    .thumb { width: 180px; height: 120px; object-fit: cover; border-radius: 6px; }
+    .photo-card { min-width: 200px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Google Drive Auto Photo Sync</h2>
+    <div id="status" class="mb-3 text-muted"></div>
+    <div id="gallery" class="d-flex flex-wrap gap-3"></div>
+  </div>
+
+  <script>
+    // 👇 Aapke diye huye API Key aur Folder ID
+    const API_KEY = "AIzaSyACL1BBtMdua_vQKbsGr2jUDeXphnDTFkI";
+    const FOLDER_ID = "1zF3ZfWBc-YrnZ-tJQqQDSq0lSIEobchg";
+
+    const statusEl = document.getElementById("status");
+    const gallery = document.getElementById("gallery");
+
+    function updateStatus(msg) {
+      statusEl.textContent = msg;
+    }
+
+    async function listImageFilesInFolder(folderId) {
+      const q = `'${folderId}' in parents and (mimeType contains 'image/') and trashed = false`;
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&pageSize=1000&fields=files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink)&key=${API_KEY}`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error("Drive API request failed: " + r.status);
+      const data = await r.json();
+      return data.files;
+    }
+
+    function renderFiles(files) {
+      gallery.innerHTML = "";
+      files.forEach(f => {
+        const card = document.createElement("div");
+        card.className = "card p-2 photo-card";
+        card.style.width = "200px";
+
+        const img = document.createElement("img");
+        img.className = "thumb mb-2";
+        img.src = f.thumbnailLink || `https://drive.google.com/uc?export=view&id=${f.id}`;
+        img.alt = f.name;
+
+        const title = document.createElement("div");
+        title.textContent = f.name;
+        title.style.fontSize = "0.9rem";
+        title.style.marginBottom = "6px";
+        title.style.whiteSpace = "nowrap";
+        title.style.overflow = "hidden";
+        title.style.textOverflow = "ellipsis";
+
+        const btnGroup = document.createElement("div");
+        btnGroup.className = "d-flex gap-2";
+
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "btn btn-sm btn-outline-primary";
+        dlBtn.textContent = "Download";
+        dlBtn.href = `https://drive.google.com/uc?export=download&id=${f.id}`;
+        dlBtn.target = "_blank";
+
+        const viewBtn = document.createElement("a");
+        viewBtn.className = "btn btn-sm btn-outline-secondary";
+        viewBtn.textContent = "Open";
+        viewBtn.href = f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`;
+        viewBtn.target = "_blank";
+
+        btnGroup.appendChild(dlBtn);
+        btnGroup.appendChild(viewBtn);
+
+        card.appendChild(img);
+        card.appendChild(title);
+        card.appendChild(btnGroup);
+        gallery.appendChild(card);
+      });
+    }
+
+    async function init() {
+      try {
+        updateStatus("Loading photos...");
+        const files = await listImageFilesInFolder(FOLDER_ID);
+        if (!files || files.length === 0) {
+          updateStatus("No images found or folder is not shared publicly.");
+          return;
+        }
+        updateStatus(`Found ${files.length} image(s)`);
+        renderFiles(files);
+      } catch (e) {
+        console.error(e);
+        updateStatus("Error loading files. Check API key, folder ID, and sharing permissions.");
+      }
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
