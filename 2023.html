@@ -28,8 +28,27 @@
       max-width: 900px;
       text-align: center;
     }
-    .photo-card img { width: 100%; height: 180px; object-fit: cover; border-radius: 8px; }
-    .photo-title { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .photo-card {
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      text-align: center;
+    }
+    .photo-card img {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      display: block;
+      margin: 0 auto;
+    }
+    .photo-title {
+      font-size: 0.9rem;
+      margin-top: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #loadMoreBtn { display: none; }
   </style>
 </head>
 <body>
@@ -50,94 +69,108 @@
   <div class="container">
     <div id="status" class="mb-3 text-center text-muted"></div>
     <div id="gallery" class="row g-3"></div>
+    <div class="text-center mt-3">
+      <button id="loadMoreBtn" class="btn btn-success">Load More</button>
+    </div>
   </div>
 
   <script>
-    // 👇 Aapka API key aur Folder ID
+    // 👇 Tumhara API key aur Folder ID
     const API_KEY = "AIzaSyACL1BBtMdua_vQKbsGr2jUDeXphnDTFkI";
     const FOLDER_ID = "1zF3ZfWBc-YrnZ-tJQqQDSq0lSIEobchg";
 
     const statusEl = document.getElementById("status");
     const gallery = document.getElementById("gallery");
+    const loadMoreBtn = document.getElementById("loadMoreBtn");
+
+    let nextPageToken = null;
+    const PAGE_SIZE = 20;
 
     function updateStatus(msg) {
       statusEl.textContent = msg;
     }
 
-    async function listImageFilesInFolder(folderId) {
+    async function listImageFilesInFolder(folderId, pageToken = null) {
       const q = `'${folderId}' in parents and (mimeType contains 'image/') and trashed = false`;
-      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&pageSize=1000&fields=files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink)&key=${API_KEY}`;
+      let url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&pageSize=${PAGE_SIZE}&fields=nextPageToken,files(id,name,mimeType,thumbnailLink)&key=${API_KEY}`;
+      if (pageToken) url += `&pageToken=${pageToken}`;
       const r = await fetch(url);
       if (!r.ok) throw new Error("Drive API request failed: " + r.status);
       const data = await r.json();
+      nextPageToken = data.nextPageToken || null;
       return data.files;
     }
 
     function renderFiles(files) {
-      gallery.innerHTML = "";
       files.forEach(f => {
         const col = document.createElement("div");
         col.className = "col-12 col-sm-6 col-md-4 col-lg-3";
 
         const card = document.createElement("div");
-        card.className = "card shadow-sm h-100 photo-card";
+        card.className = "photo-card";
 
         const img = document.createElement("img");
         img.src = f.thumbnailLink || `https://drive.google.com/uc?export=view&id=${f.id}`;
         img.alt = f.name;
 
-        const body = document.createElement("div");
-        body.className = "card-body p-2 d-flex flex-column";
-
         const title = document.createElement("div");
-        title.className = "photo-title mb-2";
+        title.className = "photo-title";
         title.textContent = f.name;
 
         const btnGroup = document.createElement("div");
-        btnGroup.className = "mt-auto d-flex justify-content-between";
+        btnGroup.className = "d-flex justify-content-center gap-2 mt-2";
 
         const dlBtn = document.createElement("a");
         dlBtn.className = "btn btn-sm btn-primary";
         dlBtn.textContent = "Download";
         dlBtn.href = `https://drive.google.com/uc?export=download&id=${f.id}`;
+        dlBtn.download = f.name;
         dlBtn.target = "_blank";
 
         const viewBtn = document.createElement("a");
         viewBtn.className = "btn btn-sm btn-outline-secondary";
         viewBtn.textContent = "Open";
-        viewBtn.href = f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`;
+        viewBtn.href = `https://drive.google.com/file/d/${f.id}/view`;
         viewBtn.target = "_blank";
 
         btnGroup.appendChild(dlBtn);
         btnGroup.appendChild(viewBtn);
 
-        body.appendChild(title);
-        body.appendChild(btnGroup);
-
         card.appendChild(img);
-        card.appendChild(body);
+        card.appendChild(title);
+        card.appendChild(btnGroup);
+
         col.appendChild(card);
         gallery.appendChild(col);
       });
     }
 
-    async function init() {
+    async function loadPhotos() {
       try {
         updateStatus("Loading photos...");
-        const files = await listImageFilesInFolder(FOLDER_ID);
+        const files = await listImageFilesInFolder(FOLDER_ID, nextPageToken);
         if (!files || files.length === 0) {
-          updateStatus("No images found or folder is not shared publicly.");
+          updateStatus("No more images found.");
+          loadMoreBtn.style.display = "none";
           return;
         }
-        updateStatus(`Found ${files.length} image(s)`);
+        updateStatus("");
         renderFiles(files);
+        if (nextPageToken) {
+          loadMoreBtn.style.display = "inline-block";
+        } else {
+          loadMoreBtn.style.display = "none";
+        }
       } catch (e) {
         console.error(e);
         updateStatus("Error loading files. Check API key, folder ID, and sharing permissions.");
       }
     }
 
-    window.onload = init;
+    window.onload = () => {
+      loadPhotos();
+      loadMoreBtn.addEventListener("click", loadPhotos);
+    };
   </script>
 </body>
 </html>
