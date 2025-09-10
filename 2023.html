@@ -28,12 +28,7 @@
       max-width: 900px;
       text-align: center;
     }
-    .photo-card {
-      border: none;
-      background: transparent;
-      box-shadow: none;
-      text-align: center;
-    }
+    .photo-card { border: none; background: transparent; text-align: center; }
     .photo-card img {
       width: 100%;
       height: auto;
@@ -61,7 +56,7 @@
 
   <!-- Info Box -->
   <div class="info-box">
-    <h4>Your Lovely Photos Priya ❤️</h4>
+    <h4>Your Lovely Photos ❤️</h4>
     <p>Below are the synced photos directly from Google Drive. You can view or download them anytime.</p>
   </div>
 
@@ -75,7 +70,6 @@
   </div>
 
   <script>
-    // 👇 Tumhara API key aur Folder ID
     const API_KEY = "AIzaSyACL1BBtMdua_vQKbsGr2jUDeXphnDTFkI";
     const FOLDER_ID = "1zF3ZfWBc-YrnZ-tJQqQDSq0lSIEobchg";
 
@@ -91,8 +85,8 @@
     }
 
     async function listImageFilesInFolder(folderId, pageToken = null) {
-      const q = `'${folderId}' in parents and (mimeType contains 'image/') and trashed = false`;
-      let url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&pageSize=${PAGE_SIZE}&fields=nextPageToken,files(id,name,mimeType,thumbnailLink)&key=${API_KEY}`;
+      const q = `'${folderId}' in parents and trashed = false and mimeType contains 'image/'`;
+      let url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&pageSize=${PAGE_SIZE}&fields=nextPageToken,files(id,name,mimeType,webViewLink)&key=${API_KEY}`;
       if (pageToken) url += `&pageToken=${pageToken}`;
       const r = await fetch(url);
       if (!r.ok) throw new Error("Drive API request failed: " + r.status);
@@ -109,8 +103,9 @@
         const card = document.createElement("div");
         card.className = "photo-card";
 
+        // ✅ Clear Full Image (Googleusercontent link)
         const img = document.createElement("img");
-        img.src = f.thumbnailLink || `https://drive.google.com/uc?export=view&id=${f.id}`;
+        img.src = `https://lh3.googleusercontent.com/d/${f.id}=w1000`;
         img.alt = f.name;
 
         const title = document.createElement("div");
@@ -125,12 +120,11 @@
         dlBtn.textContent = "Download";
         dlBtn.href = `https://drive.google.com/uc?export=download&id=${f.id}`;
         dlBtn.download = f.name;
-        dlBtn.target = "_blank";
 
         const viewBtn = document.createElement("a");
         viewBtn.className = "btn btn-sm btn-outline-secondary";
-        viewBtn.textContent = "Open";
-        viewBtn.href = `https://drive.google.com/file/d/${f.id}/view`;
+        viewBtn.textContent = "Open in Drive";
+        viewBtn.href = f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`;
         viewBtn.target = "_blank";
 
         btnGroup.appendChild(dlBtn);
@@ -163,7 +157,7 @@
         }
       } catch (e) {
         console.error(e);
-        updateStatus("Error loading files. Check API key, folder ID, and sharing permissions.");
+        updateStatus("❌ Error: Check API key, folder ID, and make sure folder is Public.");
       }
     }
 
